@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .logo {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            width: 50%;
+        }
+        form {
+            text-align: center;
+        }
+        textarea {
+            width: 50%;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <img class="logo" src="/static/logo.png" alt="Logo">
+    <form action="/send" method="post">
+        <textarea name="content"></textarea><br>
+        <p>How long to destroy the post?</p>
+        <select name="retention">
+            <option value="12">12 Hours</option>
+            <option value="24">1 Day</option>
+            <option value="168">7 Days</option>
+            <option value="336">14 Days</option>
+            <option value="720">30 Days</option>
+        </select><br><br>
+        <input type="submit" value="Send">
+    </form>
+</body>
+</html>
