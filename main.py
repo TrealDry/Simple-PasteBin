@@ -2,28 +2,34 @@ import os
 import atexit
 import datetime
 import mysql.connector
+from icecream import ic
+from redis import Redis
 from flask import Flask, render_template, redirect, request
 
 from config import *
 from s3client import S3Client
 from generate_hash import generate_hash
 
+
 app = Flask(__name__)
 s3client = S3Client(
-    S3["ACCESS_KEY"],
-    S3["SECRET_KEY"],
-    S3["HOST"],
-    S3["BUCKET"]
+    access_key=S3["ACCESS_KEY"], secret_key=S3["SECRET_KEY"],
+    endpoint_url=S3["HOST"], bucket_name=S3["BUCKET"]
 )
 mysql = mysql.connector.connect(
-    host=MYSQL["HOST"],
-    user=MYSQL["USER"],
-    password=MYSQL["PASSWORD"],
-    database=MYSQL["DB_NAME"]
+    host=MYSQL["HOST"], user=MYSQL["USER"],
+    password=MYSQL["PASSWORD"], database=MYSQL["DB_NAME"]
 )
+redis = Redis(
+    host=REDIS["HOST"], port=REDIS["PORT"], db=0
+)
+
+if not SETTINGS["DEBUG_MODE"]:
+    ic.disable()
 
 
 @app.get("/")
+@app.get("/index")
 @app.get("/index.html")
 def index():
     return render_template("index.html")
@@ -78,18 +84,44 @@ def send():
 @app.get("/<post_id>")
 @app.get("/view/<post_id>")
 def view(post_id: str):
-    with mysql.cursor(buffered=True) as cursor:
-        cursor.execute(
-            "SELECT * FROM Post WHERE `id` = %s", (post_id,)
-        )
-        mysql.commit()
+    text = redis.get(post_id + "-file")
+    cache = False
 
-        result = cursor.fetchall()
+    if text is None:
+        ic("Text is not in the cache")
 
-    if not bool(result):
-        return "Oops... There's no such post."
+        with mysql.cursor(buffered=True) as cursor:
+            cursor.execute(
+                "SELECT * FROM Post WHERE `id` = %s", (post_id,)
+            )
+            mysql.commit()
 
-    text = s3client.get_file(post_id + ".txt").decode()
+            result = cursor.fetchall()
+
+        if not bool(result):
+            return "Oops... There's no such post."
+
+        text = s3client.get_file(post_id + ".txt").decode()
+    else:
+        ic("Text in the cache")
+        cache = True
+        text = text.decode()
+
+    visit_counter = redis.get(post_id + "-visit-counter")
+    if visit_counter is None:
+        ic("Visit counter doesn't exist")
+        redis.set(post_id + "-visit-counter", 0, SETTINGS["VISIT_COUNTER_LIFETIME"])
+        visit_counter = 0
+    else:
+        visit_counter = int(visit_counter) + 1  # +1 просмотр текущего пользователя
+
+    ic(f"Visit counter = {visit_counter}")
+
+    redis.incr(post_id + "-visit-counter")
+
+    if visit_counter >= SETTINGS["CACHE_A_POST_WHEN_FILLED"] and not cache:
+        ic("Text is cached!")
+        redis.set(post_id + "-file", text, SETTINGS["CACHE_LIFETIME"])
 
     return render_template("view.html", text=text)
 
@@ -120,6 +152,7 @@ def clean_expired_posts():
 
     for object_id in for_removal:
         s3client.delete_file(object_id + ".txt")
+        redis.delete(object_id + "-visit-counter", object_id + "-file")
 
     return f"{len(for_removal)} posts have been cleared"
 
@@ -130,3 +163,7 @@ def exit_handler():
 
 
 atexit.register(exit_handler)
+
+
+if __name__ == "__main__":
+    app.run()

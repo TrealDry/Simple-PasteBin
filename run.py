@@ -1,3 +1,7 @@
+"""
+Use for local startup.
+"""
+
 import os
 from sys import exit
 
@@ -6,7 +10,6 @@ os.environ['FLASK_APP'] = 'main.py'
 os.environ['FLASK_ENV'] = 'venv'
 
 try:
-
     for file in os.listdir(f"{os.getcwd()}"):
         if file == "cert.pem":
             print("start https")

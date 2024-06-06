@@ -13,3 +13,15 @@ MYSQL = {
     "DB_NAME": "simple_pastebin",
     "HOST": "localhost"
 }
+
+REDIS = {
+    "HOST": "localhost",
+    "PORT": 6379
+}
+
+SETTINGS = {
+    "DEBUG_MODE": False,  # True - Debug messages will appear, False - On the contrary
+    "CACHE_A_POST_WHEN_FILLED": 10,
+    "VISIT_COUNTER_LIFETIME": 60 * 60 * 1,
+    "CACHE_LIFETIME": 60 * 60 * 6
+}
